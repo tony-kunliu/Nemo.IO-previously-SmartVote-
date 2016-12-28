@@ -1,0 +1,481 @@
+; ------------------------------------------------------------------------------
+; Election
+; ------------------------------------------------------------------------------
+; - init
+; - addLog
+; - setSingleAttribute
+; - setKvAttribute
+; - addLlAttritbute
+; - rmLlAttritbute
+; - setOptions
+; - registerVoter
+; - deregisterVoter
+; - registerAno
+; - deregisterAno
+; - addLinkBetweenAccount
+; - rmLinkBetweenAccount
+; - recordBallot
+; - withdrawBallot
+; - suicideElection
+; ------------------------------------------------------------------------------
+
+(def 'election () {
+    ; --------------------------------------------------------------------------
+    ; References
+    ; --------------------------------------------------------------------------
+    (include "./env.def")
+    (include "./defs/single.def")
+    (include "./defs/stdll.def")
+    (include "./defs/stdkv.def")
+
+    ; --------------------------------------------------------------------------
+    ; Parameters
+    ; --------------------------------------------------------------------------
+    (def 'cmd () (calldataload 0x0))
+
+    (def 'crtraddr () (calldataload 0x20)) ;User address of the creator of the election
+
+    (def 'log () (calldataload 0x20))
+
+    (def 'vtraddr () (calldataload 0x20)) ;User address of the voter
+
+    (def 'ansvtraddr () (calldataload 0x40)) ;User address of the anonymous voter
+
+    (def 'optionnum () (calldataload 0x20)) ;Number of options
+
+    (def 'option () (calldataload 0x20)) ;The index of option voted
+    (def 'ballot () (calldataload 0x40)) ;New result of the option
+
+    (def 'singleAttributeKey () (calldataload 0x20))
+    (def 'singleAttributeValue () (calldataload 0x40))
+
+    (def 'attributeKey () (calldataload 0x20))
+
+    (def 'kvAttributeKey () (calldataload 0x40))
+    (def 'kvAttributeValue () (calldataload 0x60))
+
+    (def 'rmLlAttributeKey () (calldataload 0x40))
+
+    (def 'addLlAttributeKey () (calldataload 0x40))
+    (def 'addLlAttributeValue () (calldataload 0x60))
+
+    ; --------------------------------------------------------------------------
+    ; Variables
+    ; --------------------------------------------------------------------------
+    (singleInit "CREATED" (TIMESTAMP))
+    (singleInit "electionName" 0)
+    (singleInit "desHash" 0) ;Hash of description
+    (singleInit "logHash" 0) ;Hash of log
+    (singleInit "owner" 0)
+    (singleInit "optionNumber" 0)
+    (singleInit "opened" 0)
+    (singleInit "closed" 0)
+    (singleInit "electionManagerAddress" 0)
+    (singleInit "prerequisiteElection" 0) ;Should be allowed to set multiple elections, but single for now
+    (singleInit "followupElection" 0) ;Should be allowed to set multiple elections, but single for now
+    (kvInit "hasPermList")
+    (kvInit "permList")
+    (kvInit "ballots") ;Initialize ballot counting
+    (llInit "logs")
+
+    (singleInit "lastVoter")
+    (llInit "voterList")
+    (llInit "reverseVoterList")
+    (kvInit "distributed")
+
+    (singleInit "lastAno")
+    (llInit "anoList")
+    (llInit "reverseAnoList")
+
+    (llInit "legalAttributeKeys")
+    (llAddLink "legalAttributeKeys" "owner" 1)
+    (llAddLink "legalAttributeKeys" "desHash" 1)
+    (llAddLink "legalAttributeKeys" "logHash" 1)
+    (llAddLink "legalAttributeKeys" "opened" 1)
+    (llAddLink "legalAttributeKeys" "closed" 1)
+    (llAddLink "legalAttributeKeys" "status" 1)
+    (llAddLink "legalAttributeKeys" "hasPermList" 1)
+    (llAddLink "legalAttributeKeys" "permList" 1)
+    (llAddLink "legalAttributeKeys" "distributed" 1)
+
+    (singleInit "status" 0)
+    ; status:
+    ;   0 - empty
+    ;   1 - created (the only status in which the contract can be edited)
+    ;   2 - options set
+    ;   3 - all attributes except opened and closed are set
+    ;   4 - waiting to be opened
+    ;   5 - on-going (opened but not closed)
+    ;   6 - closed
+
+    (return 0 (lll {
+        ; ----------------------------------------------------------------------
+        ; Init a new election.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "init" (CALLER) crtraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (&& (= (cmd) "init") (= (singleGet "status") 0)) {
+            (singleSet "owner" (crtraddr))
+            (singleSet "electionManagerAddress" (CALLER))
+			(singleSet "status" 1)
+
+			[0x0]1
+			(return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Add a log entry. (called by the owner)
+        ; ----------------------------------------------------------------------
+        ; Calldata: "addLog" log
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "addLog") {
+            ;TODO Check if the caller is the owner
+
+            ;Add a log entry
+            (llAddLink "logs" (TIMESTAMP) log)
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Set a single attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "setSingleAttribute" singleAttributeKey singleAttributeValue
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "setSingleAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (singleAttributeKey)) 1) (STOP))
+            
+            ;Execute the setting
+            (singleSet (singleAttributeKey) (singleAttributeValue))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Set a kv attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "setKvAttribute" attributeKey kvAttributeKey kvAttributeValue
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "setKvAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (attributeKey)) 1) (STOP))
+            
+            ;Execute the setting
+            (kvSet (attributeKey) (kvAttributeKey) (kvAttributeValue))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Add a ll attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "addLlAttribute" attributeKey addLlAttributeKey addLlAttributeValue
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "addLlAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (attributeKey)) 1) (STOP))
+            
+            ;Check if the key exists
+            (unless (= (llGet (attributeKey) (addLlAttributeKey)) 0) (STOP))
+
+            ;Execute the setting
+            (llAddLink (attributeKey) (addLlAttributeKey) (addLlAttributeValue))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Remove a ll attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "rmLlAttribute" attributeKey rmLlAttributeKey
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "rmLlAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (attributeKey)) 1) (STOP))
+            
+            ;Check if the key exists
+            (unless (= (llGet (attributeKey) (addLlAttributeKey)) 1) (STOP))
+
+            ;Execute the setting
+            (llRmLink (attributeKey) (rmLlAttributeKey))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Set options.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "setOptions" optionnum
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "setOptions") {
+            ;TODO Check if the caller has the permission to set
+
+			(for {[0xE0]1} (<= @0xE0 (singleGet "optionNumber")) [0xE0](+ @0xE0 1)
+				(kvSet "ballots" @0xE0 0)
+			)
+
+            (singleSet "optionNumber" (optionnum))
+
+            (when (= (singleGet "status") 1) (singleSet "status" 2))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Register a voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "registerVoter" vtraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "registerVoter") {
+            ;TODO Check if the caller has the permission to set
+
+            ;TODO Check if the provided address is a valid user
+
+            ;Check if the voter exists in the list
+            (unless (= (llGet "reverseVoterList" (vtraddr)) 0) (STOP))
+
+            ;If there is no user stored
+            (when (= (singleGet "lastVoter") 0) {
+                (llAddLink "voterList" "HEAD" (vtraddr))
+                (llAddLink "reverseVoterList" (vtraddr) "HEAD")
+            })
+
+            ;If there is a user stored
+            (unless (= (singleGet "lastVoter") 0) {
+                (llAddLink "voterList" (singleGet "lastVoter") (vtraddr))
+                (llAddLink "reverseVoterList" (vtraddr) (singleGet "lastVoter"))
+            })
+
+            (singleSet "lastVoter" (vtraddr))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Deregister a voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "deregisterVoter" vtraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "deregisterVoter") {
+            ;TODO Check if the caller has the permission to set
+
+            ;TODO Check if the provided address is a valid user
+
+            ;Check if the voter exists in the list
+            (when (= (llGet "reverseVoterList" (vtraddr)) 0) (STOP))
+
+            [0x0](CALLER) ;Address of the user
+            [0x20](llGet "reverseVoterList" @0x0)
+
+            ;If the user to be removed is tail
+            (when (= @0x0 (singleGet "lastVoter")) {
+
+                ;If the user to be removed is head
+                (when (= @0x20 "HEAD") {
+                    (llRmLink "voterList" "HEAD")
+                    (singleSet "lastVoter" 0)
+                })
+
+                ;If the user to be removed is not head
+                (unless (= @0x20 "HEAD") {
+                    (llRmLink "voterList" @0x20)
+                    (singleSet "lastVoter" @0x20)
+                })
+                (llRmLink "reverseVoterList" @0x0)
+            })
+
+            ;If the user to be removed is head
+            (when (= @0x20 "HEAD") {
+                [0x40](llGet "voterList" @0x0)
+                (llRmLink "voterList" @0x0)
+                (llRmLink "reverseVoterList" @0x0)
+                (llAddLink "voterList" "HEAD" @0x40)
+                (llAddLink "reverseVoterList" @0x40 "HEAD")
+            })
+
+            ;If the user to be removed is not head or tail
+            (unless (|| (= @0x0 (singleGet "lastVoter")) (= @0x20 "HEAD")) {
+                [0x40](llGet "voterList" @0x0)
+                (llRmLink "voterList" @0x0)
+                (llRmLink "voterList" @0x20)
+                (llRmLink "reverseVoterList" @0x0)
+                (llRmLink "reverseVoterList" @0x40)
+                (llAddLink "voterList" @0x20 @0x40)
+                (llAddLink "reverseVoterList" @0x40 @0x20)
+            })
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Register an anonymous voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "registerAno" vtraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "registerAno") {
+            ;TODO Check if the caller has the permission to set
+
+            ;TODO Check if the provided address is a valid user
+
+            ;Check if the voter exists in the list
+            (unless (= (llGet "reverseAnoList" (vtraddr)) 0) (STOP))
+
+            ;If there is no user stored
+            (when (= (singleGet "lastAno") 0) {
+                (llAddLink "anoList" "HEAD" (vtraddr))
+                (llAddLink "reverseAnoList" (vtraddr) "HEAD")
+            })
+
+            ;If there is a user stored
+            (unless (= (singleGet "lastAno") 0) {
+                (llAddLink "anoList" (singleGet "lastAno") (vtraddr))
+                (llAddLink "reverseAnoList" (vtraddr) (singleGet "lastAno"))
+            })
+
+            (singleSet "lastAno" (vtraddr))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Deregister an anonymous voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "deregisterAno" vtraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "deregisterAno") {
+            ;TODO Check if the caller has the permission to set
+
+            ;TODO Check if the provided address is a valid user
+
+            ;Check if the voter exists in the list
+            (when (= (llGet "reverseAnoList" (vtraddr)) 0) (STOP))
+
+            [0x0](CALLER) ;Address of the user
+            [0x20](llGet "reverseAnoList" @0x0)
+
+            ;If the user to be removed is tail
+            (when (= @0x0 (singleGet "lastAno")) {
+
+                ;If the user to be removed is head
+                (when (= @0x20 "HEAD") {
+                    (llRmLink "anoList" "HEAD")
+                    (singleSet "lastAno" 0)
+                })
+
+                ;If the user to be removed is not head
+                (unless (= @0x20 "HEAD") {
+                    (llRmLink "anoList" @0x20)
+                    (singleSet "lastAno" @0x20)
+                })
+                (llRmLink "reverseAnoList" @0x0)
+            })
+
+            ;If the user to be removed is head
+            (when (= @0x20 "HEAD") {
+                [0x40](llGet "anoList" @0x0)
+                (llRmLink "anoList" @0x0)
+                (llRmLink "reverseAnoList" @0x0)
+                (llAddLink "anoList" "HEAD" @0x40)
+                (llAddLink "reverseAnoList" @0x40 "HEAD")
+            })
+
+            ;If the user to be removed is not head or tail
+            (unless (|| (= @0x0 (singleGet "lastAno")) (= @0x20 "HEAD")) {
+                [0x40](llGet "anoList" @0x0)
+                (llRmLink "anoList" @0x0)
+                (llRmLink "anoList" @0x20)
+                (llRmLink "reverseAnoList" @0x0)
+                (llRmLink "reverseAnoList" @0x40)
+                (llAddLink "anoList" @0x20 @0x40)
+                (llAddLink "reverseAnoList" @0x40 @0x20)
+            })
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Record a ballot.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "recordBallot" (CALLER) option ballot
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (&& (= (cmd) "recordBallot")) {
+            ;Check if the caller is a registered voter
+            (when (= (llGet "reverseAnoList" (CALLER)) 0) (STOP))
+            
+            (unless (<= (option) (singleGet "optionNumber")) (STOP))
+
+            (kvSet "ballots" (option) (+ (kvGet "ballots" (option)) (ballot)))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Withdraw a ballot.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "withdrawBallot" (CALLER) option ballot
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (&& (= (cmd) "withdrawBallot")) {
+            ;Check if the caller is a registered voter
+            (when (= (llGet "reverseAnoList" (CALLER)) 0) (STOP))
+
+            (unless (<= (option) (singleGet "optionNumber")) (STOP))
+
+            (kvSet "ballots" (option) (- (kvGet "ballots" (option)) (ballot)))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ;-----------------------------------------------------------------------
+        ; Remove the Election. (called by the owner)
+        ;-----------------------------------------------------------------------
+        ; Calldata: "suicideElection" (CALLER) (ORIGIN)
+        ; Returns: suicide
+        ;-----------------------------------------------------------------------
+        (when (= (cmd) "suicideElection") {
+            ; check if the caller is the owner
+            (unless (= (CALLER) owner) (STOP))
+
+            ; remove the record in ElectionManager
+            [0x0]"removeElection"
+            (CALL (gass) (singleGet "electionManagerAddr") 0 0x0 0x20 0x20 0x20)
+            
+            (unless (= @0x20 1) (STOP))
+
+            (suicide (ORIGIN))
+        })        
+    } 0))
+})

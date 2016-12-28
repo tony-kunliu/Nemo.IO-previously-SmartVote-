@@ -1,0 +1,216 @@
+; ------------------------------------------------------------------------------
+; Administrator
+; ------------------------------------------------------------------------------
+; - init
+; - setPassword
+; - registerVoter
+; - deregisterVoter
+; - addLlAttribute
+; - rmLlAttribute
+; - removeElection
+; - destructVoter
+; - suicideAccount
+; ------------------------------------------------------------------------------
+(def 'administrator () {
+
+    ; --------------------------------------------------------------------------
+    ; References
+    ; --------------------------------------------------------------------------
+    (include "./env.def")
+    (include "./defs/single.def")
+    (include "./defs/stdll.def")
+
+    ; --------------------------------------------------------------------------
+    ; Parameters
+    ; --------------------------------------------------------------------------
+    (def 'cmd () (calldataload 0x0))
+
+    (def 'vtraddr () (calldataload 0x20))
+    (def 'elecaddr () (calldataload 0x40))
+
+    (def 'pswrd () (calldataload 0x20))
+
+    (def 'attributeKey () (calldataload 0x20))
+
+    (def 'rmLlAttributeKey () (calldataload 0x40))
+
+    (def 'addLlAttributeKey () (calldataload 0x40))
+    (def 'addLlAttributeValue () (calldataload 0x60))
+    
+    ; --------------------------------------------------------------------------
+    ; Variables
+    ; --------------------------------------------------------------------------
+    (singleInit "CREATED" (TIMESTAMP))
+    (singleInit "password" 0)
+    (singleInit "hash" 0) ;Hash of description of user
+    (singleInit "accountManagerAddress" 0)
+
+    (llInit "legalAttributeKeys")
+    (llAddLink "legalAttributeKeys" "hash" 1)
+
+    (return 0 (lll {
+        ; ----------------------------------------------------------------------
+        ; Init the user.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "init" (CALLER)
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "init") {
+            (singleSet "accountManagerAddress" (CALLER))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Set the password.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "setPassword" pswrd
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "setPassword") {
+            (singleSet "password" (pswrd))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Register a voter in an election
+        ; ----------------------------------------------------------------------
+        ; Calldata: "registerVoter" vtraddr elecaddr
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "registerVoter") {
+            [0x20]"registerVoter"
+            [0x40](vtraddr)
+            (CALL (gass) (elecaddr) 0 0x20 0x40 0x60 0x20)
+
+            (unless (= @0x60 1) (STOP))
+
+            [0x20]"registerElection"
+            [0x40](elecaddr)
+            (CALL (gass) (vrtaddr) 0 0x20 0x40 0x60 0x20)
+
+            (unless (= @0x60 1) (STOP))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Deregister a voter in an election
+        ; ----------------------------------------------------------------------
+        ; Calldata: "deregisterVoter" vtraddr elecaddr
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "registerVoter") {
+            [0xA0]"deregisterVoter"
+            [0xC0](vtraddr)
+            (CALL (gass) (elecaddr) 0 0xA0 0x40 0x60 0x20)
+
+            (unless (= @0x60 1) (STOP))
+
+            [0xA0]"deregisterElection"
+            [0xC0](elecaddr)
+            (CALL (gass) (vtraddr) 0 0xA0 0x40 0x60 0x20)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+
+        ; ----------------------------------------------------------------------
+        ; Add a ll attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "addLlAttribute" attributeKey addLlAttributeKey addLlAttributeValue
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "addLlAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (attributeKey)) 1) (STOP))
+            
+            ;Check if the key exists
+            (unless (= (llGet (attributeKey) (addLlAttributeKey)) 0) (STOP))
+
+            ;Execute the setting
+            (llAddLink (attributeKey) (addLlAttributeKey) (addLlAttributeValue))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Remove a ll attribute.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "rmLlAttribute" attributeKey rmLlAttributeKey
+        ; Returns: 0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "rmLlAttribute") {
+            ;TODO Check if the caller has the permission to set
+
+            ;Check if the key is legal
+            (unless (= (llGet "legalAttributeKeys" (attributeKey)) 1) (STOP))
+            
+            ;Check if the key exists
+            (unless (= (llGet (attributeKey) (addLlAttributeKey)) 1) (STOP))
+
+            ;Execute the setting
+            (llRmLink (attributeKey) (rmLlAttributeKey))
+            
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ;-----------------------------------------------------------------------
+        ; Remove the Election.
+        ;-----------------------------------------------------------------------
+        ; Calldata: "removeElection" elecaddr
+        ; Returns: 0 - fail | 1 - success
+        ;-----------------------------------------------------------------------
+        (when (= (cmd) "removeElection") {
+            ;Remove the record in election
+            [0x0]"removeElection"
+            (CALL (gass) (elecaddr) 0 0x0 0x20 0x20 0x20)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ;-----------------------------------------------------------------------
+        ; Destruct the voter.
+        ;-----------------------------------------------------------------------
+        ; Calldata: "destructVoter" vtraddr
+        ; Returns: 0 - fail | 1 - success
+        ;-----------------------------------------------------------------------
+        (when (= (cmd) "destructVoter") {
+            ; remove the record in AccountManager
+            [0x0]"suicideAccount"
+            (CALL (gass) (vtraddr) 0 0x0 0x20 0x20 0x20)
+            
+            (unless (= @0x20 1) (STOP))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ;-----------------------------------------------------------------------
+        ; Destruct the administrator.
+        ;-----------------------------------------------------------------------
+        ; Calldata: "suicideAccount" (ORIGIN)
+        ; Returns: suicide
+        ;-----------------------------------------------------------------------
+        (when (= (cmd) "suicideAccount") {
+            ; remove the record in AccountManager
+            [0x0]"destructAdmin"
+            (CALL (gass) (singleGet "accountManagerAddr") 0 0x0 0x20 0x20 0x20)
+            
+            (unless (= @0x20 1) (STOP))
+
+            (suicide (ORIGIN))
+        })
+
+    } 0))
+})

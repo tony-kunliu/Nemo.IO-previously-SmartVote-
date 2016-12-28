@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>SmartVote Login</title>
+<link rel="stylesheet" type="text/css" href="./css/style.css" />
+<link rel="stylesheet" type="text/css" href="./css/body.css" />
+
+</head>
+
+<body>
+	<div class="container">
+		<div id="content">
+			<form id="loginForm">
+				<h1>SmartVote</h1>
+				<!-- input username and password -->
+				<input type="text" placeholder="Username" id="username" /> <input
+					type="password" placeholder="Password" id="password" />
+			</form>
+			
+			
+				<button onclick="login('organizer')" id="loginBtn1"
+					class="btn btn-primary">Login as Organizer</button>	
+				<a id="regBtn" href="./templates/Registration/Registration.html" style="float: right;">
+						Register as Organizer</a> 	
+				<!-- a id="fpBtn"
+						href="./templates/RetrievePassword/RetrievePassword.html">
+						Forgot password? </a-->
+						
+				<button onclick="login('voter')" id="loginBtn2"
+					class="btn btn-primary" >Login as Voter</button>
+			
+				<button onclick="login('anonymousVoter')" id="loginBtn3"
+					class="btn btn-primary" >Login as Anonymous Voter</button>
+					
+				
+				
+			<br><br><br><br><br><br><br>
+
+			<div id="intro">
+				<a href="https://github.com/E-Movement/SmartVote" target="_blank">
+					SmartVote on Github </a>
+			</div>
+		</div>
+
+	</div>
+
+	<footer style="text-align: center;">
+		<br> <br> <br> <br> <br> <br>
+		<p>
+			Get to know about <a href="http://e-mov.org/" target="_blank">E-Movement</a>
+		</p>
+	</footer>
+<script type="text/javascript" src="templates/API/utils.js"></script>
+<script type="text/javascript" src="templates/Login/Login.js"></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,405 @@
+; ------------------------------------------------------------------------------
+; AccountManager
+; ------------------------------------------------------------------------------
+; - createAdmin
+; - createVoter
+; - createAno
+; - addToBlacklist
+; - deleteFromBlacklist
+; - checkBlacklist
+; - destructAdmin
+; - destructVoter
+; - destructAno
+; ------------------------------------------------------------------------------
+
+{
+    ; --------------------------------------------------------------------------
+    ; References
+    ; --------------------------------------------------------------------------
+    (include "./Administrator.lll")
+	(include "./Voter.lll")
+    (include "./defs/single.def")
+    (include "./defs/stdll.def")
+    (include "./defs/stdkv.def")
+    (include "./env.def")
+    
+    ; --------------------------------------------------------------------------
+    ; Constants
+    ; --------------------------------------------------------------------------
+    (def 'DAPPDOUG 0xdaffe)
+
+    ; --------------------------------------------------------------------------
+    ; Parameters
+    ; --------------------------------------------------------------------------
+    (def 'cmd () (calldataload 0x0))
+
+    (def 'usrname () (calldataload 0x20))
+
+    (def 'usraddr () (calldataload 0x20))
+
+    ; --------------------------------------------------------------------------
+    ; Variables
+    ; --------------------------------------------------------------------------
+    (singleInit "buffer")
+
+    (singleInit "lastAdmin")
+    (llInit "adminAddressToAdminName")
+    (llInit "adminNameToAdminAddress")
+    (llInit "adminList")
+    (llInit "reverseAdminList")
+
+    (singleInit "lastVoter")
+    (llInit "voterAddressToVoterName")
+    (llInit "voterNameToVoterAddress")
+    (llInit "voterList")
+    (llInit "reverseVoterList")
+
+    (singleInit "lastAno")
+    (llInit "anoAddressToAnoName")
+    (llInit "anoNameToAnoAddress")
+    (llInit "anoList")
+    (llInit "reverseAnoList")
+
+    (llInit "blacklist")
+
+    (return 0 (lll {
+        ; ----------------------------------------------------------------------
+        ; Create a contract for a new administrator.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "createAdmin" usrname
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "createAdmin") {
+            (singleSet "buffer" (usrname)) ;Store the username in case of conflict
+
+            ;Create the contract
+            [0x0](create 0 0 (lll {
+                      (administrator)
+                  } 0))
+            [[@0x0]]1
+
+            ;If there is no user stored
+            (when (= (singleGet "lastAdmin") 0) {
+                (llAddLink "adminList" "HEAD" @0x0)
+                (llAddLink "reverseAdminList" @0x0 "HEAD")
+            })
+
+            ;If there is a user stored
+            (unless (= (singleGet "lastAdmin") 0) {
+                (llAddLink "adminList" (singleGet "lastAdmin") @0x0)
+                (llAddLink "reverseAdminList" @0x0 (singleGet "lastAdmin"))
+            })
+
+            (singleSet "lastAdmin" @0x0)
+            (llAddLink "adminAddressToAdminName" @0x0 (singleGet "buffer"))
+            (llAddLink "adminNameToAdminAddress" (singleGet "buffer") @0x0)
+            
+            [0x20]"setPerm"
+            [0x40]"userAccount"
+            [0x60]@0x0
+            [0x80]1
+            (CALL (gass) DAPPDOUG 0 0x20 0x80 0x20 0x20)
+
+            [0x20]"init"
+            (CALL (gass) @0x0 0 0x20 0x20 0x20 0x20)
+
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Create a contract for a new voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "createVoter" usrname
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "createVoter") {
+            (singleSet "buffer" (usrname)) ;Store the username in case of conflict
+
+            ;Create the contract
+            [0x0](create 0 0 (lll {
+                      (voter)
+                  } 0))
+            [[@0x0]]1
+
+            ;If there is no user stored
+            (when (= (singleGet "lastVoter") 0) {
+                (llAddLink "voterList" "HEAD" @0x0)
+                (llAddLink "reverseVoterList" @0x0 "HEAD")
+            })
+
+            ;If there is a user stored
+            (unless (= (singleGet "lastVoter") 0) {
+                (llAddLink "voterList" (singleGet "lastVoter") @0x0)
+                (llAddLink "reverseVoterList" @0x0 (singleGet "lastVoter"))
+            })
+
+            (singleSet "lastVoter" @0x0)
+            (llAddLink "voterAddressToVoterName" @0x0 (singleGet "buffer"))
+            (llAddLink "voterNameToVoterAddress" (singleGet "buffer") @0x0)
+            
+            [0x20]"setPerm"
+            [0x40]"userAccount"
+            [0x60]@0x0
+            [0x80]1
+            (CALL (gass) DAPPDOUG 0 0x20 0x80 0x20 0x20)
+
+            [0x20]"init"
+            (CALL (gass) @0x0 0 0x20 0x20 0x20 0x20)
+
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Create a contract for a new anonymous voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "createAno" usrname
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "createAno") {
+            (singleSet "buffer" (usrname)) ;Store the username in case of conflict
+
+            ;Create the contract
+            [0x0](create 0 0 (lll {
+                      (voter)
+                  } 0))
+            [[@0x0]]1
+
+            ;If there is no user stored
+            (when (= (singleGet "lastAno") 0) {
+                (llAddLink "anoList" "HEAD" @0x0)
+                (llAddLink "reverseAnoList" @0x0 "HEAD")
+            })
+
+            ;If there is a user stored
+            (unless (= (singleGet "lastAno") 0) {
+                (llAddLink "anoList" (singleGet "lastAno") @0x0)
+                (llAddLink "reverseAnoList" @0x0 (singleGet "lastAno"))
+            })
+
+            (singleSet "lastAno" @0x0)
+            (llAddLink "anoAddressToAnoName" @0x0 (singleGet "buffer"))
+            (llAddLink "anoNameToAnoAddress" (singleGet "buffer") @0x0)
+            
+            [0x20]"setPerm"
+            [0x40]"userAccount"
+            [0x60]@0x0
+            [0x80]1
+            (CALL (gass) DAPPDOUG 0 0x20 0x80 0x20 0x20)
+
+            [0x20]"init"
+            (CALL (gass) @0x0 0 0x20 0x20 0x20 0x20)
+
+            (return 0x0 0x20)
+        })
+
+
+        ; ----------------------------------------------------------------------
+        ; Add a user to blacklist.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "addToBlacklist" usraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "addToBlacklist") {
+            ;Check if the user is already in blacklist
+            (unless (= (llGet "blacklist" (usraddr)) 0) (STOP))
+
+            ;Add the user to blacklist
+            (llAddLink "blacklist" (usraddr) 1)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Delete a user from blacklist.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "deleteFromBlacklist" usraddr
+        ; Returns: 0 - fail | 1 - success
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "deleteFromBlacklist") {
+            ;Check if the user is in blacklist
+            (when (= (llGet "blacklist" (usraddr)) 0) (STOP))
+
+            ;Delete the user from blacklist
+            (llRmLink "blacklist" (usraddr))
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Check if a user is in blacklist.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "checkBlacklist" usraddr
+        ; Returns: 
+        ;       0 - user not in blacklist | 1 - user in blacklist
+        ; ---------------------------------------------------------------------- 
+        (when (= (cmd) "checkBlacklist") {
+            (when (= (llGet "blacklist" (usraddr)) 0) [0x0]0)
+            (unless (= (llGet "blacklist" (usraddr)) 0) [0x0]1)
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Destruct an administrator.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "destructAdmin" (CALLER)
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "destructAdmin") {
+            [0x0](CALLER) ;Address of the user
+            [0x20](llGet "reverseAdminList" @0x0)
+
+            ;If the user to be removed is tail
+            (when (= @0x0 (singleGet "lastAdmin")) {
+
+                ;If the user to be removed is head
+                (when (= @0x20 "HEAD") {
+                    (llRmLink "adminList" "HEAD")
+                    (singleSet "lastAdmin" 0)
+                })
+
+                ;If the user to be removed is not head
+                (unless (= @0x20 "HEAD") {
+                    (llRmLink "adminList" @0x20)
+                    (singleSet "lastAdmin" @0x20)
+                })
+                (llRmLink "reverseAdminList" @0x0)
+            })
+
+            ;If the user to be removed is head
+            (when (= @0x20 "HEAD") {
+                [0x40](llGet "adminList" @0x0)
+                (llRmLink "adminList" @0x0)
+                (llRmLink "reverseAdminList" @0x0)
+                (llAddLink "adminList" "HEAD" @0x40)
+                (llAddLink "reverseAdminList" @0x40 "HEAD")
+            })
+
+            ;If the user to be removed is not head or tail
+            (unless (|| (= @0x0 (singleGet "lastAdmin")) (= @0x20 "HEAD")) {
+                [0x40](llGet "adminList" @0x0)
+                (llRmLink "adminList" @0x0)
+                (llRmLink "adminList" @0x20)
+                (llRmLink "reverseAdminList" @0x0)
+                (llRmLink "reverseAdminList" @0x40)
+                (llAddLink "adminList" @0x20 @0x40)
+                (llAddLink "reverseAdminList" @0x40 @0x20)
+            })
+
+            (llRmLink "adminNameToAdminAddress" (llGet "adminAddressToAdminName" @0x0))
+            (llRmLink "adminAddressToAdminName" @0x0)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Destruct a voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "destructVoter" (CALLER)
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "destructVoter") {
+            [0x0](CALLER) ;Address of the user
+            [0x20](llGet "reverseVoterList" @0x0)
+
+            ;If the user to be removed is tail
+            (when (= @0x0 (singleGet "lastVoter")) {
+
+                ;If the user to be removed is head
+                (when (= @0x20 "HEAD") {
+                    (llRmLink "voterList" "HEAD")
+                    (singleSet "lastVoter" 0)
+                })
+
+                ;If the user to be removed is not head
+                (unless (= @0x20 "HEAD") {
+                    (llRmLink "voterList" @0x20)
+                    (singleSet "lastVoter" @0x20)
+                })
+                (llRmLink "reverseVoterList" @0x0)
+            })
+
+            ;If the user to be removed is head
+            (when (= @0x20 "HEAD") {
+                [0x40](llGet "voterList" @0x0)
+                (llRmLink "voterList" @0x0)
+                (llRmLink "reverseVoterList" @0x0)
+                (llAddLink "voterList" "HEAD" @0x40)
+                (llAddLink "reverseVoterList" @0x40 "HEAD")
+            })
+
+            ;If the user to be removed is not head or tail
+            (unless (|| (= @0x0 (singleGet "lastVoter")) (= @0x20 "HEAD")) {
+                [0x40](llGet "voterList" @0x0)
+                (llRmLink "voterList" @0x0)
+                (llRmLink "voterList" @0x20)
+                (llRmLink "reverseVoterList" @0x0)
+                (llRmLink "reverseVoterList" @0x40)
+                (llAddLink "voterList" @0x20 @0x40)
+                (llAddLink "reverseVoterList" @0x40 @0x20)
+            })
+
+            (llRmLink "voterNameToVoterAddress" (llGet "voterAddressToVoterName" @0x0))
+            (llRmLink "voterAddressToVoterName" @0x0)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+
+        ; ----------------------------------------------------------------------
+        ; Destruct an anonymous voter.
+        ; ----------------------------------------------------------------------
+        ; Calldata: "destructAno" (CALLER)
+        ; Returns:  0 - fail | 1 - success
+        ; ----------------------------------------------------------------------
+        (when (= (cmd) "destructAno") {
+            [0x0](CALLER) ;Address of the user
+            [0x20](llGet "reverseAnoList" @0x0)
+
+            ;If the user to be removed is tail
+            (when (= @0x0 (singleGet "lastAno")) {
+
+                ;If the user to be removed is head
+                (when (= @0x20 "HEAD") {
+                    (llRmLink "anoList" "HEAD")
+                    (singleSet "lastAno" 0)
+                })
+
+                ;If the user to be removed is not head
+                (unless (= @0x20 "HEAD") {
+                    (llRmLink "anoList" @0x20)
+                    (singleSet "lastAno" @0x20)
+                })
+                (llRmLink "reverseAnoList" @0x0)
+            })
+
+            ;If the user to be removed is head
+            (when (= @0x20 "HEAD") {
+                [0x40](llGet "anoList" @0x0)
+                (llRmLink "anoList" @0x0)
+                (llRmLink "reverseAnoList" @0x0)
+                (llAddLink "anoList" "HEAD" @0x40)
+                (llAddLink "reverseAnoList" @0x40 "HEAD")
+            })
+
+            ;If the user to be removed is not head or tail
+            (unless (|| (= @0x0 (singleGet "lastAno")) (= @0x20 "HEAD")) {
+                [0x40](llGet "anoList" @0x0)
+                (llRmLink "anoList" @0x0)
+                (llRmLink "anoList" @0x20)
+                (llRmLink "reverseAnoList" @0x0)
+                (llRmLink "reverseAnoList" @0x40)
+                (llAddLink "anoList" @0x20 @0x40)
+                (llAddLink "reverseAnoList" @0x40 @0x20)
+            })
+
+            (llRmLink "anoNameToAnoAddress" (llGet "anoAddressToAnoName" @0x0))
+            (llRmLink "anoAddressToAnoName" @0x0)
+
+            [0x0]1
+            (return 0x0 0x20)
+        })
+    } 0))
+}

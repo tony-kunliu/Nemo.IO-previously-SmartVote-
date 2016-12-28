@@ -1,0 +1,39 @@
+#File Deployment
+
+!{DOUG
+deploy:
+	"./SmartVoteDOUG.lll" => {{DOUG}}
+!}DOUG
+
+!{EM
+modify-deploy:
+	"./ElectionManager.lll" => {{EM}}
+	"(def 'DAPPDOUG 0xdaffe)" => "(def 'DAPPDOUG {{DOUG}})"
+!}EM
+
+!{AM
+modify-deploy:
+	"./AccountManager.lll" => {{AM}}
+	"(def 'DAPPDOUG 0xdaffe)" => "(def 'DAPPDOUG {{DOUG}})"
+!}AM
+
+!{setup
+transact:
+	{{DOUG}} => "setPerm" "doug" {{EM}} 1
+
+transact:
+	{{DOUG}} => "setPerm" "electionManager" {{EM}} 1
+
+transact:
+	{{DOUG}} => "register" "electionManager" {{EM}}
+
+transact:
+	{{DOUG}} => "setPerm" "doug" {{AM}} 1
+
+transact:
+	{{DOUG}} => "setPerm" "accountManager" {{AM}} 1
+
+transact:
+	{{DOUG}} => "register" "accountManager" {{AM}}
+
+!}setup
